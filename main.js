@@ -2,7 +2,7 @@ var steam = require("steam");
 var steamUser = require("steam-user");
 var fs = require("fs");
 
-var TradeOfferManager = require("steam-tradeoffer-manager")
+var TradeOfferManager = require("steam-tradeoffer-manager");
 
 var client = new steamUser();
 
@@ -15,16 +15,19 @@ var steamClient = new steam.SteamClient();
 var steamUser = new steam.SteamUser(steamClient);
 var steamFriends = new steam.SteamFriends(steamClient);
 
-var identiySecret = '';
-var sharedSecret = '';
+var config = fs.readFileSync("config.json");
+var configFormatted = JSON.parse(config);
+
+var identiySecret = configFormatted.identitysecret;
+var sharedSecret = configFormatted.sharedsecret;
 
 var inTrade = false;
 
 client.setOption("promptSteamGuardCode", false);
 
 client.logOn({
-	"accountName": "",
-	"password": ""
+	"accountName": configFormatted.username,
+	"password": configFormatted.password
 });
 
 fs.readFile('polldata.json', function (err, data) {
