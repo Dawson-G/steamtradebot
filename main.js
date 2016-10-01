@@ -33,11 +33,7 @@ var tempTradeURl = 'https://steamcommunity.com/tradeoffer/new/?partner=306671577
 
 client.setOption("promptSteamGuardCode", false);
 
-client.logOn({
-	"accountName": configFormatted.username,
-	"password": configFormatted.password,
-	"machineName": "nodeJS-Bot"
-});
+logIn();
 
 fs.readFile('polldata.json', function (err, data) {
     if (err) {
@@ -76,17 +72,36 @@ client.on("loggedOn", function(details){
 	
 	console.log("Logged on to steam!");
 	
+	loadUserInventory(client.steamID.accountid, 753, 6, function(err, data){
+	    if(err){
+	        console.log("Error Loading Our Steam Inventory");
+	    }else{
+	        steamInv = data;
+	    }
+	});
 	
-	var sid = new SteamID();
-    sid.universe = SteamID.Universe.PUBLIC;
-    sid.type = SteamID.Type.INDIVIDUAL;
-    sid.instance = SteamID.Instance.DESKTOP;
-    sid.accountid = client.steamID.accountid;
-    
-    steamID3 = sid.getSteam3RenderedID();
-    steamID64 = sid.getSteamID64();
+	loadUserInventory(client.steamID.accountid, 730, 2, function(err, data){
+	   if(err){
+	       console.log("Error Loading Our CS:GO Inventory");
+	   }else{
+	       csgoInv = data;
+	   }
+	});
 	
-	loadSteamAndCSGOInventory();
+	loadUserInventory(306671577, 753, 6,  function(err, data){
+	    if(err){
+	       console.log("error loading user inventory"); 
+	    }else{
+            
+            sendTradeOffer(tempTradeURl, [{"appid":753,"contextid":6,"assetid":"2623938436"}], [{"appid":753,"contextid":6,"assetid":"3341118391"}], "Hello", function(err, status){
+                if(err){
+                    console.log(status);
+                }else{
+                    console.log(status);
+                }
+            });
+	    }
+	});
 });
 
 client.on("steamGuard", function(domain, callback, lastCodeWrong){
@@ -200,69 +215,80 @@ manager.on('pollData', function (pollData) {
     fs.writeFile('polldata.json', JSON.stringify(pollData));
 });
 
-function loadSteamAndCSGOInventory(){
-    manager.loadUserInventory(steamID3, 730, 2, true, function(err, inventory, currency){
-	    if(err){
-	        console.log("Error Loading CS:GO Inventory: " + err);
-	    }else{
-	        console.log("Successfully loaded CS:GO Inventory");
-	        
-	        for(var items in inventory){
-	            console.log(inventory[items].market_name);
-	        }
-	        
-	        csgoInv = inventory;
-	        
-	    }
-	});
-	
-    manager.loadUserInventory(steamID3, 753, 6, true, function(err, inventory, currency){
-	    if(err){
-	        console.log("Error Loading Steam Inventory: " + err);
-	    }else{
-	        console.log("Successfully loaded Steam Inventory");
-	        
-	       // for(var items in inventory){
-	       //     console.log(inventory[items].market_name);
-	       // }
-	       
-	       steamInv = inventory;
-	    }
+function logIn(){
+    client.logOn({
+        "accountName": configFormatted.username,
+    	"password": configFormatted.password,
+    	"machineName": "nodeJS-Bot"
+    });   
+}
+
+/*
+
+loadUserInventory(account#, appID, tabNumber, function(err, data){
+    if(err){
+        console.log("Error Loading Our Steam Inventory");
+    }else{
+        steamInv = data;
+    }
+});
+
+*/
+
+function loadUserInventory(user, appid, num, callback){
+    
+    var sid = new SteamID();
+    sid.universe = SteamID.Universe.PUBLIC;
+    sid.type = SteamID.Type.INDIVIDUAL;
+    sid.instance = SteamID.Instance.DESKTOP;
+    sid.accountid = user;
+    
+    var steam3id = sid.getSteam3RenderedID();
+    
+    manager.loadUserInventory(steam3id, appid, num, true, function(err, inventory, currency){
+    if(err){
+        callback(true, null);
+    }else{
+	   callback(false, inventory);
+	   }
 	});
 }
 
-function sendTradeOfferWithMyItems(tradeUrl, items){
-    var url = tradeUrl;
-    
-    var offer = manager.createOffer(url);
-    
-    for(var item in items){
-        offer.addMyItem({"appid": items[item].appid, "contextid": items[item].contextid, "assetid": items[item].assetid});
+/*
+
+TradeURL = Person to send Trade Offer to
+theirItems/myItems format = {"appid": #, "contextid": #, "assetid": "#"}
+message = string format
+callback = a way to check errors
+
+sendTradeOffer(tempTradeURl, [{"appid":753,"contextid":6,"assetid":"2623938436"}], [{"appid":753,"contextid":6,"assetid":"3341118391"}], "Hello", function(err, status){
+    if(err){
+        console.log(status);
+    }else{
+        console.log(status);
     }
+});
+
+*/
+
+function sendTradeOffer(tradeUrl, theirItems, myItems, message, callback){
+    var offer = manager.createOffer(tradeUrl);
+    
+    if(theirItems != null){
+        offer.addTheirItems(theirItems);
+    }
+    
+    if(myItems != null){
+        offer.addMyItems(myItems);
+    }
+    
+    offer.setMessage(message);
 
     offer.send(function(err, status) {
         if (err) {
-            console.log("Trade " + err);
+            callback(true, "Trade " + err);
         } else {
-            console.log("Offer #" + offer.id + " " + status);
-        }
-    });
-}
-
-function sendTradeOfferWithTheirItems(tradeUrl, items){
-    var url = tradeUrl;
-    
-    var offer = manager.createOffer(url);
-    
-    for(var item in items){
-        offer.addTheirItem({"appid": items[item].appid, "contextid": items[item].contextid, "assetid": items[item].assetid});
-    }
-
-    offer.send(function(err, status) {
-        if (err) {
-            console.log("Trade " + err);
-        } else {
-            console.log("Offer #" + offer.id + " " + status);
+            callback(false, status);
         }
     });
 }
